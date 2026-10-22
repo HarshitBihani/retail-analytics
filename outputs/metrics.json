@@ -1,0 +1,26 @@
+{
+  "total_revenue": 19392174,
+  "orders": 39514,
+  "customers": 5852,
+  "champions_customers": 1464,
+  "champions_revenue_share": 70.0,
+  "champions_customer_share": 25.0,
+  "at_risk_customers": 359,
+  "at_risk_historic_revenue": 1036347,
+  "uk_share_pct": 85.3,
+  "anonymous_checkout_share_pct": 13.3,
+  "sep_nov_share_2010_pct": 36.2,
+  "nov_vs_avg_off_peak_2010": 2.2,
+  "month1_retention_pct": 21.0,
+  "month3_retention_pct": 21.7,
+  "month12_retention_pct": 18.3,
+  "one_time_buyers": 1619,
+  "one_time_share_pct": 27.7,
+  "winback_scenarios_gbp": {
+    "10": 25909,
+    "15": 38863,
+    "20": 51817
+  },
+  "retention_lift_5pts_extra_repeat_customers_per_month": 10.6,
+  "retention_lift_5pts_monthly_revenue_gbp": 7986
+}
