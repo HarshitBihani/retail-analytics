@@ -72,118 +72,96 @@ metrics = dict(
 )
 json.dump(metrics, open("outputs/metrics.json", "w"), indent=2)
 
-# ---------- charts ----------
-INK, MUTED = "#1f2937", "#6b7280"
-BLUE, TEAL, AMBER, RED, GREY = "#2563eb", "#0d9488", "#d97706", "#dc2626", "#9ca3af"
-layout = dict(template="plotly_white", font=dict(family="Inter, Segoe UI, Arial", color=INK, size=13),
-              margin=dict(l=50, r=20, t=50, b=40), height=380)
+# ---------- charts and page (shared look in theme.py) ----------
+import theme as T
+from plotly.offline import get_plotlyjs
 
-# 1 monthly revenue UK vs intl
+V, O, B, P, Y, G = T.PALETTE
+gbp = lambda v: f"GBP {v:,.0f}"
+
 f1 = go.Figure()
-f1.add_bar(x=monthly.month, y=monthly.uk_revenue, name="United Kingdom", marker_color=BLUE)
-f1.add_bar(x=monthly.month, y=monthly.intl_revenue, name="International", marker_color=TEAL)
-f1.update_layout(**{**layout, "margin": dict(l=50, r=20, t=90, b=40)}, barmode="stack",
-                 title="Monthly revenue (GBP): the Sep to Nov climb repeats every year",
-                 yaxis_title="Revenue (GBP)", legend=dict(orientation="h", y=1.0, x=0, yanchor="bottom"))
+f1.add_bar(x=monthly.month, y=monthly.uk_revenue, name="United Kingdom", marker_color=V)
+f1.add_bar(x=monthly.month, y=monthly.intl_revenue, name="International", marker_color=B)
+chart1 = T.fig_html(f1, barmode="stack", yaxis_title="Revenue (GBP)", legend=dict(orientation="h", y=1.1, x=0), margin=dict(l=60, r=20, t=40, b=40))
 
-# 2 segments
 order = ["Champions", "Loyal", "At Risk (was valuable)", "Needs Attention", "New / Promising", "Lost / Low value"]
 seg_o = seg.set_index("segment").loc[order].reset_index()
-cols = [BLUE, TEAL, RED, AMBER, "#7c3aed", GREY]
 f2 = make_subplots(rows=1, cols=2, subplot_titles=("Share of customers", "Share of revenue"), specs=[[{"type": "pie"}, {"type": "pie"}]])
-f2.add_pie(labels=seg_o.segment, values=seg_o.customers, marker=dict(colors=cols), hole=.45, sort=False, textinfo="percent", row=1, col=1)
-f2.add_pie(labels=seg_o.segment, values=seg_o.revenue, marker=dict(colors=cols), hole=.45, sort=False, textinfo="percent", row=1, col=2)
-f2.update_layout(title="A quarter of customers bring about 7 in 10 pounds of revenue", **layout)
+f2.add_pie(labels=seg_o.segment, values=seg_o.customers, marker=dict(colors=T.PALETTE), hole=.55, sort=False, textinfo="percent", row=1, col=1)
+f2.add_pie(labels=seg_o.segment, values=seg_o.revenue, marker=dict(colors=T.PALETTE), hole=.55, sort=False, textinfo="percent", row=1, col=2)
+chart2 = T.fig_html(f2, height=380, margin=dict(l=10, r=10, t=40, b=20))
 
-# 3 cohort heatmap
 pv = ret[(ret.months_since <= 12)].pivot(index="cohort_month", columns="months_since", values="retention_pct")
 pv = pv[pv.index < "2011-01-01"]
 f3 = go.Figure(go.Heatmap(z=pv.values, x=[f"M{c}" for c in pv.columns], y=[d.strftime("%b %Y") for d in pv.index],
-                          colorscale="Blues", zmin=0, zmax=60, colorbar=dict(title="% still buying"),
+                          colorscale=[[0, "#f4f2ff"], [1, "#4b3fd6"]], zmin=0, zmax=60, colorbar=dict(title="% still buying"),
                           hovertemplate="Cohort %{y}<br>%{x}: %{z}%<extra></extra>"))
-f3.update_layout(title="Cohort retention: only about 1 in 5 first-time buyers come back the next month", **layout)
 f3.update_yaxes(autorange="reversed")
-f3.update_layout(height=480)
+chart3 = T.fig_html(f3, height=470)
 
-# 4 returns
-f4 = go.Figure(go.Bar(x=ret_prod.return_rate_pct, y=ret_prod.description, orientation="h", marker_color=RED,
-                      text=[f"{v:.0f}%  (GBP {r:,.0f} lost)" for v, r in zip(ret_prod.return_rate_pct, ret_prod.revenue_lost)],
-                      textposition="outside"))
-f4.update_layout(**{**layout, "margin": dict(l=260, r=140, t=50, b=40)},
-                 title="Products with the worst return rates (sold 1,000+ units, 10%+ returned)",
-                 xaxis=dict(title="% of units returned", range=[0, 115]), yaxis=dict(autorange="reversed"))
+f4 = go.Figure(go.Bar(x=ret_prod.return_rate_pct, y=ret_prod.description, orientation="h", marker_color=O,
+                      text=[f"{v:.0f}%  (GBP {r:,.0f} lost)" for v, r in zip(ret_prod.return_rate_pct, ret_prod.revenue_lost)], textposition="outside"))
+chart4 = T.fig_html(f4, margin=dict(l=250, r=150, t=20, b=40), xaxis=dict(title="% of units returned", range=[0, 115], gridcolor="#e9e5da"),
+                    yaxis=dict(autorange="reversed"))
 
-# 5 bundles
-f5 = go.Figure(go.Bar(x=pairs.baskets_together, y=[f"{a}  +  {b}" for a, b in zip(pairs.product_a, pairs.product_b)],
-                      orientation="h", marker_color=TEAL))
-f5.update_layout(**{**layout, "margin": dict(l=420, r=20, t=50, b=40)},
-                 title="Products most often bought in the same basket (bundle candidates)",
-                 xaxis_title="Baskets containing both", yaxis=dict(autorange="reversed"))
+f5 = go.Figure(go.Bar(x=pairs.baskets_together, y=[f"{a}  +  {b}" for a, b in zip(pairs.product_a, pairs.product_b)], orientation="h", marker_color=B))
+chart5 = T.fig_html(f5, margin=dict(l=430, r=20, t=20, b=40), xaxis=dict(title="Baskets containing both", gridcolor="#e9e5da"), yaxis=dict(autorange="reversed"))
 
-# 6 top countries ex UK
 c_ex = countries[countries.country != "United Kingdom"].head(8)
-f6 = go.Figure(go.Bar(x=c_ex.country, y=c_ex.revenue, marker_color=BLUE))
-f6.update_layout(title="Top international markets by revenue (GBP)", **layout, yaxis_title="Revenue (GBP)")
+f6 = go.Figure(go.Bar(x=c_ex.country, y=c_ex.revenue, marker_color=V))
+chart6 = T.fig_html(f6, yaxis_title="Revenue (GBP)")
 
-from plotly.offline import get_plotlyjs
-plotly_js = get_plotlyjs()
+kpi_html = T.kpis([
+    ("Net revenue analysed", gbp(tot.r), "across 2010 to 2011"), ("Orders", f"{int(tot.o):,}", "all valid orders"),
+    ("Identified customers", f"{n_cust:,}", "known customer profiles"),
+    ("Revenue from top 25% of customers", f"{metrics['champions_revenue_share']}%", "customer revenue share"),
+    ("First-time buyers back next month", f"{m1:.0f}%", "month 1 repeat rate"),
+])
 
-def div(f): return f.to_html(full_html=False, include_plotlyjs=False, config=dict(displayModeBar=False))
+actions = T.action_cards([
+    (1, f"Protect the {int(champ.customers):,} Champions",
+     f"They are {metrics['champions_customer_share']}% of customers but {metrics['champions_revenue_share']}% of revenue (average {gbp(champ.avg_revenue)} each, "
+     f"last bought about {int(champ.avg_recency_days)} days ago). Give them early access to new ranges and a named account contact before any discount."),
+    (2, f"Win back the {int(risk.customers)} At-Risk customers",
+     f"They placed about {risk.avg_orders:.0f} orders on average and spent {gbp(risk_hist)} in total, but have been silent for about {int(risk.avg_recency_days)} days. "
+     f"If 10 to 20% return at half their old yearly spend, that is roughly {gbp(winback[10])} to {gbp(winback[20])} a year.",
+     "Planning range from stated assumptions, not a forecast"),
+    (3, "Fix the second-order problem",
+     f"Only {m1:.0f}% of new customers buy again in month 1, and {metrics['one_time_share_pct']}% of all customers ({onetime:,}) bought exactly once. "
+     f"Lifting month-1 return by {lift_pts} points on about {new_per_month:,.0f} new customers a month means about {extra_repeat:,.0f} extra repeat buyers a month "
+     f"(about {gbp(retention_gain_month)} a month at average spend)."),
+    (4, "Plan stock and cash for September",
+     f"Sep to Nov delivered {metrics['sep_nov_share_2010_pct']}% of 2010 revenue, and November ran {nov10/avg_other_2010:.1f}x the off-peak monthly average. "
+     "Order and staff ahead of September, not October."),
+    (5, "Bundle what is already bought together",
+     f"The top pairs (for example red and white hanging-heart tea-light holders, {int(pairs.baskets_together.iloc[0]):,} shared baskets) are colour or size variants, so sell them as sets."),
+    (6, "Investigate quality on high-return lines",
+     f"Several lines, such as {ret_prod.description.iloc[1].title() if len(ret_prod) > 1 else ''}, are returned at 10% to over 80%. Check suppliers and listings before reordering. "
+     "A very high rate on a small line can also come from one bulk return, so look at the credit notes first."),
+    (7, "Reduce reliance on the UK",
+     f"The UK is {metrics['uk_share_pct']}% of revenue. The next markets ({', '.join(c_ex.country.head(3))}) are small, so grow them deliberately."),
+])
 
-gbp = lambda v: f"GBP {v:,.0f}"
-kpis = [
-    ("Net revenue analysed", gbp(tot.r)), ("Orders", f"{int(tot.o):,}"), ("Identified customers", f"{n_cust:,}"),
-    ("Revenue from top 25% of customers", f"{metrics['champions_revenue_share']}%"),
-    ("First-time buyers back next month", f"{m1:.0f}%"),
-]
-kpi_html = "".join(f"<div class='kpi'><div class='kv'>{v}</div><div class='kl'>{l}</div></div>" for l, v in kpis)
-clean_rows = "".join(f"<tr><td>{r.step}</td><td class='n'>{int(r.rows_affected):,}</td></tr>" for r in clean.itertuples())
+clean_table = T.table(["Cleaning step", "Rows"], [[T.esc(r.step), f"{int(r.rows_affected):,}"] for r in clean.itertuples()], numeric_cols=(1,))
 
-recs = f"""
-<ol class='recs'>
-<li><b>Protect the {int(champ.customers):,} Champions.</b> They are {metrics['champions_customer_share']}% of customers but {metrics['champions_revenue_share']}% of revenue
-(average {gbp(champ.avg_revenue)} each, last bought about {int(champ.avg_recency_days)} days ago). Give them early access to new ranges and a named account contact before any discount.</li>
-<li><b>Win back the {int(risk.customers)} At-Risk customers.</b> They placed about {risk.avg_orders:.0f} orders on average and spent {gbp(risk_hist)} in total, but have been silent for about {int(risk.avg_recency_days)} days.
-If 10 to 20% return at half their old yearly spend, that is roughly {gbp(winback[10])} to {gbp(winback[20])} a year. This is a planning range based on stated assumptions, not a forecast.</li>
-<li><b>Fix the second-order problem.</b> Only {m1:.0f}% of new customers buy again in month 1, and {metrics['one_time_share_pct']}% of all customers ({onetime:,}) bought exactly once.
-Lifting month-1 return by {lift_pts} points on about {new_per_month:,.0f} new customers a month means about {extra_repeat:,.0f} extra repeat buyers a month (about {gbp(retention_gain_month)} a month at average spend).</li>
-<li><b>Plan stock and cash for September.</b> Sep to Nov delivered {metrics['sep_nov_share_2010_pct']}% of 2010 revenue, and November ran {nov10/avg_other_2010:.1f}x the off-peak monthly average. Order and staff ahead of September, not October.</li>
-<li><b>Bundle what is already bought together.</b> The top pairs (for example red and white hanging-heart tea-light holders, {int(pairs.baskets_together.iloc[0]):,} shared baskets) are colour or size variants, so sell them as sets.</li>
-<li><b>Investigate quality on high-return lines.</b> Several lines, such as {ret_prod.description.iloc[1].title() if len(ret_prod)>1 else ''}, are returned at 10% to over 80%. Check suppliers and listings before reordering. A very high rate on a small line can also come from one bulk return, so look at the credit notes first.</li>
-<li><b>Reduce reliance on the UK.</b> The UK is {metrics['uk_share_pct']}% of revenue. The next markets ({', '.join(c_ex.country.head(3))}) are small, so grow them deliberately.</li>
-</ol>"""
+body = (kpi_html
+        + T.section("01 / The opportunity", "Recommended actions", actions, "Seven decisions, each grounded in the numbers below.")
+        + T.section("02 / Seasonality", "Revenue and the autumn climb", T.card(chart1, caption="Monthly revenue in GBP, United Kingdom vs international. The Sep to Nov climb repeats every year."))
+        + T.section("03 / Where value sits", "Customer segments", T.card(chart2, caption="A quarter of customers bring about 7 in 10 pounds of revenue."))
+        + T.section("04 / Retention", "Who comes back", T.card(chart3, caption="Cohort retention: only about 1 in 5 first-time buyers come back the next month.")
+                    + T.callout("The Dec 2009 row includes customers who were already buying before the data starts, so it looks stronger than a true new-customer cohort."))
+        + T.section("05 / Leaks", "Returns", T.card(chart4, caption="Products with the worst return rates (sold 1,000+ units, 10%+ returned)."))
+        + T.section("06 / Bundles", "What sells together", T.card(chart5, caption="Products most often bought in the same basket (bundle candidates)."))
+        + T.section("07 / Markets", "Beyond the UK", T.card(chart6, caption="Top international markets by revenue (GBP)."))
+        + T.section("Method", "How the data was cleaned",
+                    f"<details open><summary>Cleaning log</summary>{T.card(clean_table)}</details>"
+                    + T.callout(f"{metrics['anonymous_checkout_share_pct']}% of revenue has no customer id (guest checkout). It counts in revenue totals but is excluded from customer, RFM and cohort analysis. "
+                                "December 2011 is excluded from monthly trends because the data stops on 9 December."))
+        + '<div class="foot">UK online gift retailer, 1 Dec 2009 to 9 Dec 2011 (UCI Online Retail II, 1.07M raw transactions). Cleaned with SQL, analysed with RFM segmentation, '
+          'cohort retention, returns and basket analysis. Every number on this page is calculated by build_report.py.</div>')
 
-html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Retail Analytics Decision Report</title>
-<script>{plotly_js}</script>
-<style>
-:root{{--bg:#f8fafc;--card:#fff;--ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb}}
-@media (prefers-color-scheme:dark){{:root{{--bg:#0f172a;--card:#1e293b;--ink:#e5e7eb;--muted:#94a3b8;--line:#334155;--accent:#60a5fa}}}}
-*{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 Inter,Segoe UI,Arial,sans-serif}}
-.wrap{{max-width:1080px;margin:0 auto;padding:24px 16px 60px}}
-h1{{font-size:26px;margin:8px 0 4px}}h2{{font-size:19px;margin:34px 0 8px}}.sub{{color:var(--muted);margin:0 0 18px}}
-.kpis{{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:18px 0}}
-.kpi{{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}}
-.kv{{font-size:22px;font-weight:700;color:var(--accent)}}.kl{{color:var(--muted);font-size:13px}}
-.card{{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:12px 0}}
-.recs li{{margin:10px 0}}table{{border-collapse:collapse;width:100%}}td{{padding:6px 8px;border-bottom:1px solid var(--line)}}td.n{{text-align:right;font-variant-numeric:tabular-nums}}
-.note{{color:var(--muted);font-size:13px}}
-</style></head><body><div class="wrap">
-<h1>Retail Analytics: what the data says the business should do</h1>
-<p class="sub">UK online gift retailer, 1 Dec 2009 to 9 Dec 2011 (UCI Online Retail II, 1.07M raw transactions). Cleaned with SQL, analysed with RFM segmentation, cohort retention, returns and basket analysis.</p>
-<div class="kpis">{kpi_html}</div>
-<h2>Recommended actions</h2><div class="card">{recs}</div>
-<h2>1. Revenue and seasonality</h2><div class="card">{div(f1)}</div>
-<h2>2. Customer value (RFM segments)</h2><div class="card">{div(f2)}</div>
-<h2>3. Retention</h2><div class="card">{div(f3)}<p class="note">The Dec 2009 row includes customers who were already buying before the data starts, so it looks stronger than a true new-customer cohort.</p></div>
-<h2>4. Where money leaks: returns</h2><div class="card">{div(f4)}</div>
-<h2>5. What sells together</h2><div class="card">{div(f5)}</div>
-<h2>6. Markets</h2><div class="card">{div(f6)}</div>
-<h2>Data cleaning log</h2>
-<div class="card"><table>{clean_rows}</table>
-<p class="note">{metrics['anonymous_checkout_share_pct']}% of revenue has no customer id (guest checkout). It counts in revenue totals but is excluded from customer, RFM and cohort analysis.
-December 2011 is excluded from monthly trends because the data stops on 9 December.</p></div>
-</div></body></html>"""
+html = T.page("Retail Analytics Decision Report", "Retail analytics", "Executive readout  ·  2010 to 2011", "What the data says", "the shop should do.",
+              "A focused view of where customer value lives, where it leaks, and what to act on next.", body, plotly_js=get_plotlyjs(), logo="R")
 open("outputs/dashboard.html", "w", encoding="utf-8").write(html)
 
 md = f"""# Findings: Retail Analytics Decision Report
